@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Rompecabezas de Logos</title>
+<style>
+  :root{--bg:#071028;--card:#0b1220;--accent:#06b6d4;--muted:#94a3b8}
+  *{box-sizing:border-box;font-family:Inter,system-ui,Arial}
+  body{margin:0;min-height:100vh;background:linear-gradient(180deg,#071024,#07102a);color:#e6eef8;display:flex;align-items:center;justify-content:center;padding:20px}
+
+  .wrap{width:100%;max-width:1100px}
+  header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  h1{font-size:20px;margin:0}
+  .controls{display:flex;gap:8px;align-items:center}
+  button{background:var(--accent);border:0;padding:8px 12px;border-radius:8px;color:#042027;cursor:pointer;font-weight:700}
+  .board{display:grid;grid-template-columns:1fr 420px;gap:18px}
+  .panel{background:rgba(255,255,255,0.02);padding:18px;border-radius:12px}
+  .preview{display:flex;flex-direction:column;gap:10px}
+  .logo-preview{width:200px;height:200px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:800;background-size:contain;background-repeat:no-repeat;background-position:center}
+  .muted{color:var(--muted);font-size:13px}
+  .puzzle{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;width:420px}
+  .piece{border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:900;color:#fff;cursor:pointer;user-select:none;box-shadow:0 6px 18px rgba(2,6,23,0.5); transition: transform 0.2s; background-repeat:no-repeat;}
+  .piece.correct{outline:4px solid rgba(34,197,94,0.18)}
+  .info{display:flex;gap:12px;align-items:center;margin-top:10px}
+  .small{font-size:13px;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,0.02)}
+  footer{margin-top:12px;color:var(--muted);font-size:13px}
+
+  @media (max-width:900px){
+    .board{grid-template-columns:1fr;}
+    .puzzle{width:100%;grid-template-columns:repeat(3,1fr);}
+    .piece{width:calc((100% - 12px)/3);height:calc((100% - 12px)/3);}
+  }
+
+  /* Modal */
+  .modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0; top: 0;
+    width: 100%; height: 100%;
+    background-color: rgba(0,0,0,0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  .modal-content {
+    background: #0b1220;
+    color: #e6eef8;
+    padding: 30px;
+    border-radius: 12px;
+    text-align: center;
+    width: 300px;
+    animation: scaleIn 0.3s ease-out;
+    box-shadow: 0 6px 20px rgba(2,6,23,0.6);
+  }
+  .modal-content h2 {
+    margin: 0 0 12px 0;
+    color: #06b6d4;
+  }
+  .modal-content p {
+    margin: 0 0 20px 0;
+    font-size: 14px;
+  }
+  .modal-content button {
+    background: #06b6d4;
+    border: none;
+    color: #042027;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  @keyframes scaleIn {
+    0% { transform: scale(0.7); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Rompecabezas de Logos</h1>
+    <div class="controls">
+      <button id="shuffleBtn">Barajar</button>
+      <button id="newLogoBtn">Siguiente logo</button>
+    </div>
+  </header>
+
+  <div class="board">
+    <div class="panel">
+      <div class="preview">
+        <div class="muted">Logo objetivo</div>
+        <div id="logoTarget" class="logo-preview"></div>
+        <div class="info">
+          <div class="small">Movimientos: <strong id="moves">0</strong></div>
+          <div class="small">Tiempo: <strong id="time">00:00</strong></div>
+          <div class="small">Estado: <strong id="state">Jugando</strong></div>
+        </div>
+        <div class="muted">Instrucciones: haz clic en una pieza y luego en otra para intercambiarlas. Arma el logo en el menor número de movimientos.</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="muted">Rompecabezas (3x3)</div>
+      <div id="puzzle" class="puzzle" role="grid" aria-label="Rompecabezas de logo"></div>
+    </div>
+  </div>
+
+  <footer>Hecho con HTML/CSS/JS usando los SVG oficiales de redes sociales.</footer>
+</div>
+
+<!-- Modal -->
+<div id="modal" class="modal">
+  <div class="modal-content">
+    <h2>¡Felicidades!</h2>
+    <p id="modalText"></p>
+    <button id="closeModal">Cerrar</button>
+  </div>
+</div>
+
+<script>
+// Logos oficiales
+const LOGOS = [
+  {name:'Facebook', img:'https://upload.wikimedia.org/wikipedia/commons/1/1b/Facebook_icon.svg'},
+  {name:'Instagram', img:'https://upload.wikimedia.org/wikipedia/commons/a/a5/Instagram_icon.png'},
+  {name:'Twitter', img:'https://upload.wikimedia.org/wikipedia/commons/6/6f/Logo_of_Twitter.svg'},
+  {name:'LinkedIn', img:'https://upload.wikimedia.org/wikipedia/commons/c/ca/LinkedIn_logo_initials.png'},
+  {name:'YouTube', img:'https://upload.wikimedia.org/wikipedia/commons/b/b8/YouTube_Logo_2017.svg'},
+  {name:'TikTok', img:'https://upload.wikimedia.org/wikipedia/en/0/0a/TikTok_logo.svg'}
+];
+
+const puzzleEl = document.getElementById('puzzle');
+const logoTarget = document.getElementById('logoTarget');
+const shuffleBtn = document.getElementById('shuffleBtn');
+const newLogoBtn = document.getElementById('newLogoBtn');
+const movesEl = document.getElementById('moves');
+const timeEl = document.getElementById('time');
+const stateEl = document.getElementById('state');
+const modal = document.getElementById('modal');
+const modalText = document.getElementById('modalText');
+const closeModal = document.getElementById('closeModal');
+
+let currentIndex = 0;
+let pieces = [];
+let firstPick = null;
+let moves = 0;
+let timerInterval = null;
+let seconds = 0;
+
+function loadLogo(idx){
+  clearInterval(timerInterval);
+  seconds=0; timeEl.textContent='00:00';
+  moves=0; movesEl.textContent=0; stateEl.textContent='Jugando';
+  currentIndex = idx % LOGOS.length;
+  const logo = LOGOS[currentIndex];
+  logoTarget.style.backgroundImage = `url(${logo.img})`;
+  logoTarget.innerHTML = `<div style='font-size:14px;color:#cfe9f2' class='muted'>${logo.name}</div>`;
+  pieces = [];
+  puzzleEl.innerHTML='';
+
+  const size = 3; // 3x3
+  for(let r=0;r<size;r++){
+    for(let c=0;c<size;c++){
+      const id = r*size+c;
+      const el = document.createElement('div'); 
+      el.className='piece'; 
+      el.dataset.id=id;
+
+      el.style.width = `${420/size - 4}px`;
+      el.style.height = `${420/size - 4}px`;
+
+      el.style.backgroundImage=`url(${logo.img})`;
+      el.style.backgroundSize=`${size*100}% ${size*100}%`;
+      el.style.backgroundPosition=`${c*100/(size-1)}% ${r*100/(size-1)}%`;
+      el.addEventListener('click', onPieceClick);
+      puzzleEl.appendChild(el);
+
+      pieces.push({id, correctPos:id, currentPos:id, el});
+    }
+  }
+
+  shufflePieces();
+  timerInterval=setInterval(()=>{seconds++;timeEl.textContent=formatTime(seconds);},1000);
+}
+
+function shufflePieces(){
+  const arr=pieces.map(p=>p.correctPos);
+  for(let i=arr.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [arr[i],arr[j]]=[arr[j],arr[i]];
+  }
+  if(arr.every((v,i)=>v===i)){[arr[0],arr[1]]=[arr[1],arr[0]];}
+  arr.forEach((pos,idx)=>{pieces[idx].currentPos=pos;});
+  renderPieces(); moves=0;movesEl.textContent=moves;
+}
+
+function renderPieces(){
+  pieces.forEach((p,slotIdx)=>{
+    const el=p.el;
+    const placed=pieces.find(x=>x.currentPos===slotIdx);
+    if(!placed)return;
+    const size = 3;
+    const r = Math.floor(placed.correctPos/size);
+    const c = placed.correctPos%size;
+    el.style.backgroundPosition=`${c*100/(size-1)}% ${r*100/(size-1)}%`;
+    if(placed.correctPos===slotIdx){el.classList.add('correct');}else{el.classList.remove('correct');}
+  });
+}
+
+function onPieceClick(e){
+  const clickedEl=e.currentTarget;
+  const slotIndex=Array.from(puzzleEl.children).indexOf(clickedEl);
+  const pieceInSlot=pieces.find(x=>x.currentPos===slotIndex);
+  if(!firstPick){firstPick={slot:slotIndex,piece:pieceInSlot};clickedEl.style.outline='3px solid rgba(6,182,212,0.45)';return;}
+  const second={slot:slotIndex,piece:pieceInSlot};
+  if(firstPick.slot===second.slot){clickedEl.style.outline='';firstPick=null;return;}
+  const p1=firstPick.piece;const p2=second.piece;
+  const tmp=p1.currentPos;p1.currentPos=p2.currentPos;p2.currentPos=tmp;
+  moves++;movesEl.textContent=moves;
+  puzzleEl.querySelectorAll('.piece').forEach(x=>x.style.outline='');
+  firstPick=null;renderPieces();checkWin();
+}
+
+function checkWin(){
+  const ok=pieces.every((p,i)=>p.currentPos===p.correctPos);
+  if(ok){
+    stateEl.textContent='¡Completado!';
+    clearInterval(timerInterval);
+
+    let reward = seconds <= 15 ? '🍭 Paleta' : '🍬 Dulce';
+    modalText.textContent = `Armaste el logo en ${moves} movimientos y ${formatTime(seconds)}. Recompensa: ${reward}`;
+    modal.style.display = 'flex';
+  }
+}
+
+closeModal.addEventListener('click', ()=>{modal.style.display='none';});
+
+function formatTime(s){const mm=Math.floor(s/60);const ss=s%60;return String(mm).padStart(2,'0')+":"+String(ss).padStart(2,'0');}
+
+shuffleBtn.addEventListener('click',()=>{
+  shufflePieces();
+  seconds=0;timeEl.textContent='00:00';
+  moves=0;movesEl.textContent=0;
+  stateEl.textContent='Jugando';
+});
+
+newLogoBtn.addEventListener('click',()=>{
+  loadLogo((currentIndex+1)%LOGOS.length);
+});
+
+loadLogo(0);
+</script>
+</body>
+</html>
